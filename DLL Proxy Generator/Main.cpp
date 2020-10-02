@@ -4,8 +4,8 @@
 #include "ExportEntry.h"
 
 void GenerateDef( 
-	_In_ const std::string&              DLLName,
-	_In_ const std::vector<ExportEntry>& Entries
+    _In_ const std::string&              DLLName,
+    _In_ const std::vector<ExportEntry>& Entries
 )
 {
 	std::ofstream DefFileOut;
@@ -60,8 +60,8 @@ void GenerateDef(
 }
 
 void GeneratePragmas(
-	_In_ const std::string& DLLName,
-	_In_ const std::vector<ExportEntry>& Entries
+    _In_ const std::string&              DLLName,
+    _In_ const std::vector<ExportEntry>& Entries
 )
 {
 	std::ofstream PragmaFileOut;

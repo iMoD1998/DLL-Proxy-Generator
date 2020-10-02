@@ -11,7 +11,7 @@ class ExportEntry
 public:
 	static bool IsRVAInDataSection(
 		_In_ PLOADED_IMAGE Image,
-		_In_ UINT32 RVA
+		_In_ UINT32        RVA
 	);
 
 	static bool GetExportEntries(

@@ -2,7 +2,7 @@
 
 bool ExportEntry::IsRVAInDataSection( 
 	_In_ PLOADED_IMAGE Image,
-	_In_ UINT32 RVA 
+	_In_ UINT32        RVA 
 )
 {
 	for ( ULONG SectionIndex = 0; SectionIndex < Image->NumberOfSections; SectionIndex++ )
