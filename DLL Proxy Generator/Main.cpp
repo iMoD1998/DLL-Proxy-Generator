@@ -1,95 +1,130 @@
 #include <Windows.h>
-#include <imagehlp.h>
+#include <fstream>
 
-#include <string>
-#include <vector>
+#include "ExportEntry.h"
 
-int main(int argc, const char* argv[])
+void GenerateDef( 
+	_In_ const std::string&              DLLName,
+	_In_ const std::vector<ExportEntry>& Entries
+)
 {
-	LOADED_IMAGE LoadedImage;
+	std::ofstream DefFileOut;
 
-	if ( MapAndLoad( "C:\\Windows\\System32\\user32.dll", NULL, &LoadedImage, TRUE, TRUE ) )
+	DefFileOut.open( DLLName + ".def" );
+
+	if ( !DefFileOut.is_open() )
 	{
-		if ( !( LoadedImage.FileHeader->FileHeader.Characteristics & IMAGE_FILE_DLL ) )
-		{
-			printf( "File Not A DLL" );
+		printf( "Failed to open Def File\n" );
+		return;
+	}
 
-			UnMapAndLoad( &LoadedImage );
-			
-			return false;
+	DefFileOut << "LIBRARY" << std::endl;
+	DefFileOut << "EXPORTS" << std::endl;
+
+	for ( const auto& Export : Entries )
+	{
+		if ( Export.HasName() )
+		{
+			DefFileOut << "\t" << Export.GetName() << "=";
+		}
+		else
+		{
+			DefFileOut << "\t#" << Export.GetOrdinal() << "=";
 		}
 
-		ULONG ImageDirectorySize = 0;
-
-		auto ImageExportDirectory = (IMAGE_EXPORT_DIRECTORY*)ImageDirectoryEntryToData( LoadedImage.MappedAddress, FALSE, IMAGE_DIRECTORY_ENTRY_EXPORT, &ImageDirectorySize );
-
-		if ( ImageExportDirectory == NULL )
-			return false;
-
-		printf( "Characteristics    %08X\n", ImageExportDirectory->Characteristics );
-		printf( "Time Date Stamp    %08X\n", ImageExportDirectory->TimeDateStamp );
-		printf( "Ordinal Base       %i\n",   ImageExportDirectory->Base );
-		printf( "Nuber Of Functions %i\n",   ImageExportDirectory->NumberOfFunctions );
-		printf( "Nuber Of Names     %i\n",   ImageExportDirectory->NumberOfNames );
-		printf( "Version            %hu.%02hu\n", ImageExportDirectory->MajorVersion, ImageExportDirectory->MinorVersion );
-
-		auto FunctionArray    = (UINT32*)ImageRvaToVa( LoadedImage.FileHeader, LoadedImage.MappedAddress, ImageExportDirectory->AddressOfFunctions, NULL );
-		auto NameOrdinalArray = (UINT16*)ImageRvaToVa( LoadedImage.FileHeader, LoadedImage.MappedAddress, ImageExportDirectory->AddressOfNameOrdinals, NULL );
-		auto NameArray        = (UINT32*)ImageRvaToVa( LoadedImage.FileHeader, LoadedImage.MappedAddress, ImageExportDirectory->AddressOfNames, NULL );
-
-		for ( UINT32 OrdinalIndex = 0; OrdinalIndex < ImageExportDirectory->NumberOfFunctions; OrdinalIndex++ )
+		if ( Export.IsForwarded() )
 		{
-			auto        Ordinal         = ImageExportDirectory->Base + OrdinalIndex;
-			auto        FunctionRVA     = FunctionArray[ OrdinalIndex ];
-			auto        FunctionAddress = (UINT_PTR)ImageRvaToVa( LoadedImage.FileHeader, LoadedImage.MappedAddress, FunctionRVA, NULL );
-			bool        HasName         = false;
-			bool        Forwarded       = false;
-			const char* ForwardedName   = "";
-			const char* Name            = "";
+			DefFileOut << Export.GetForwardedName();
 
-			printf( "Ordinal: %4i", Ordinal );
-
-			/*Try find this ordinal in the name ordinal array*/
-			for ( UINT32 NameOrdinalIndex = 0; NameOrdinalIndex < ImageExportDirectory->NumberOfNames; NameOrdinalIndex++ )
+			if ( !Export.HasName() )
 			{
-				if ( OrdinalIndex == NameOrdinalArray[ NameOrdinalIndex ] )
-				{
-					/*Found the ordinal in the name ordinal array now use that index in the name array*/
-					Name = (const char*)ImageRvaToVa( LoadedImage.FileHeader, LoadedImage.MappedAddress, NameArray[ NameOrdinalIndex ], NULL );
-
-					printf( " Name: %-60s", Name );
-		
-					HasName = true;
-
-					break;
-				}
+				DefFileOut << " @ " << Export.GetOrdinal() << " NONAME";
 			}
+		}
+		else
+		{
+			DefFileOut << DLLName << ".";
 
-			if ( !HasName )
+			if ( Export.HasName() )
 			{
-				printf( " Name: %-60s", "[NONAME]" );
-			}
-
-			/* If function address is within the image export directory its a forwarded entry */
-			if ( FunctionAddress >= (UINT_PTR)ImageExportDirectory &&
-				FunctionAddress < ( (UINT_PTR)ImageExportDirectory + ImageDirectorySize ) )
-			{
-				ForwardedName = (const char*)FunctionAddress;
-
-				printf( "RVA:   (Forwarded) ->  %-60s", ForwardedName );
-
-				Forwarded = true;
+				DefFileOut << Export.GetName();
 			}
 			else
 			{
-				printf( "RVA:   %08X  ", FunctionRVA );
-				printf( "     %-60s", ForwardedName );
+				DefFileOut << "#" << Export.GetOrdinal() << " @ " << Export.GetOrdinal() << " NONAME";
 			}
-
-			printf( "\n" );
 		}
 
-		UnMapAndLoad( &LoadedImage );
+		DefFileOut << std::endl;
+	}
+}
+
+void GeneratePragmas(
+	_In_ const std::string& DLLName,
+	_In_ const std::vector<ExportEntry>& Entries
+)
+{
+	std::ofstream PragmaFileOut;
+
+	PragmaFileOut.open( DLLName + "Exports.h" );
+
+	if ( !PragmaFileOut.is_open() )
+	{
+		printf( "Failed to open Pragma Exports File\n" );
+		return;
+	}
+
+	for ( const auto& Export : Entries )
+	{
+		if ( Export.HasName() )
+		{
+			PragmaFileOut << "#pragma comment(linker,\"/export:" << Export.GetName() << "=";
+		}
+		else
+		{
+			PragmaFileOut << "#pragma comment(linker,\"/export:#" << Export.GetOrdinal() << "=";
+		}
+
+		if ( Export.IsForwarded() )
+		{
+			PragmaFileOut << Export.GetForwardedName();
+
+			if ( !Export.HasName() )
+			{
+				PragmaFileOut << ",@" << Export.GetOrdinal() << ",NONAME";
+			}
+		}
+		else
+		{
+			PragmaFileOut << DLLName << ".";
+
+			if ( Export.HasName() )
+			{
+				PragmaFileOut << Export.GetName();
+			}
+			else
+			{
+				PragmaFileOut << "#" << Export.GetOrdinal() << ",@" << Export.GetOrdinal() << ",NONAME";
+			}
+		}
+
+		PragmaFileOut << "\")" << std::endl;
+	}
+
+}
+
+int main(int argc, const char* argv[])
+{
+	std::vector<ExportEntry> Entries;
+
+	std::filesystem::path DLLPath = "C:\\Windows\\System32\\user32.dll";
+
+	if ( ExportEntry::GetExportEntries( DLLPath, Entries ) )
+	{
+		auto DLLName = DLLPath.filename().replace_extension( "" ).string();
+
+		GenerateDef( DLLName, Entries );
+		GeneratePragmas( DLLName, Entries );
 	}
 
 	getchar();
