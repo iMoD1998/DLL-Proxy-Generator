@@ -108,6 +108,9 @@ bool ExportEntry::GetExportEntries(
 			}
 			else
 			{
+				if ( FunctionRVA == NULL )
+					continue; // Ordinal not used
+
 				Export.SetFunctionRVA( FunctionRVA );
 			}
 
