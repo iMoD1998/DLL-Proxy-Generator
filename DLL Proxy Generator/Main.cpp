@@ -108,6 +108,11 @@ void GeneratePragmas(
 			}
 		}
 
+		if ( Export.IsData() )
+		{
+			PragmaFileOut << ",DATA";
+		}
+
 		PragmaFileOut << "\")" << std::endl;
 	}
 
