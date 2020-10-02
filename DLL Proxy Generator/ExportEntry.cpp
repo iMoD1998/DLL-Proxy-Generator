@@ -26,7 +26,8 @@ bool ExportEntry::IsRVAInDataSection(
 
 bool ExportEntry::GetExportEntries(
 	_In_  const std::filesystem::path& Path,
-	_Out_ std::vector< ExportEntry >&  Entries
+	_Out_ std::vector< ExportEntry >&  Entries,
+	_In_  bool                         Verbose
 )
 {
 	LOADED_IMAGE LoadedImage;
@@ -55,13 +56,16 @@ bool ExportEntry::GetExportEntries(
 		if ( ImageExportDirectory == NULL )
 			return false;
 
-		printf( "Characteristics    %08X\n",      ImageExportDirectory->Characteristics );
-		printf( "Time Date Stamp    %08X\n",      ImageExportDirectory->TimeDateStamp );
-		printf( "Ordinal Base       %i\n",        ImageExportDirectory->Base );
-		printf( "Nuber Of Functions %i\n",        ImageExportDirectory->NumberOfFunctions );
-		printf( "Nuber Of Names     %i\n",        ImageExportDirectory->NumberOfNames );
-		printf( "Version            %hu.%02hu\n", ImageExportDirectory->MajorVersion, ImageExportDirectory->MinorVersion );
-	
+		if ( Verbose )
+		{
+			printf( "Characteristics    %08X\n",      ImageExportDirectory->Characteristics );
+			printf( "Time Date Stamp    %08X\n",      ImageExportDirectory->TimeDateStamp );
+			printf( "Ordinal Base       %i\n",        ImageExportDirectory->Base );
+			printf( "Nuber Of Functions %i\n",        ImageExportDirectory->NumberOfFunctions );
+			printf( "Nuber Of Names     %i\n",        ImageExportDirectory->NumberOfNames );
+			printf( "Version            %hu.%02hu\n", ImageExportDirectory->MajorVersion, ImageExportDirectory->MinorVersion );
+		}
+
 		auto FunctionArray    = (UINT32*)ImageRvaToVa( LoadedImage.FileHeader, LoadedImage.MappedAddress, ImageExportDirectory->AddressOfFunctions, NULL );
 		auto NameOrdinalArray = (UINT16*)ImageRvaToVa( LoadedImage.FileHeader, LoadedImage.MappedAddress, ImageExportDirectory->AddressOfNameOrdinals, NULL );
 		auto NameArray        = (UINT32*)ImageRvaToVa( LoadedImage.FileHeader, LoadedImage.MappedAddress, ImageExportDirectory->AddressOfNames, NULL );
@@ -119,7 +123,8 @@ bool ExportEntry::GetExportEntries(
 				Export.SetIsData( ExportEntry::IsRVAInDataSection( &LoadedImage, Export.GetRVA() ) );
 			}
 
-			Export.Print();
+			if(Verbose )
+				Export.Print();
 
 			Entries.push_back( Export );
 		}

@@ -16,7 +16,8 @@ public:
 
 	static bool GetExportEntries(
 		_In_  const std::filesystem::path& Path,
-		_Out_ std::vector< ExportEntry >&  Entries
+		_Out_ std::vector< ExportEntry >&  Entries,
+		_In_  bool                         Verbose
 	);
 
 	UINT32 GetOrdinal() const
