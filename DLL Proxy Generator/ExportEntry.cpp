@@ -27,9 +27,12 @@ bool ExportEntry::IsRVAInDataSection(
 bool ExportEntry::GetExportEntries(
 	_In_  const std::filesystem::path& Path,
 	_Out_ std::vector< ExportEntry >&  Entries,
-	_In_  bool                         Verbose
+	_In_  bool                         Verbose,
+	_Out_ UINT16*                      MachineType
 )
 {
+	Entries = std::vector<ExportEntry>();
+
 	LOADED_IMAGE LoadedImage;
 
 	if ( !std::filesystem::exists( Path ) )
@@ -48,6 +51,9 @@ bool ExportEntry::GetExportEntries(
 
 			return false;
 		}
+
+		if( MachineType != NULL)
+			*MachineType = LoadedImage.FileHeader->FileHeader.Machine;
 
 		ULONG ImageDirectorySize = 0;
 
