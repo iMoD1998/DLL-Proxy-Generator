@@ -35,5 +35,8 @@
     <ClInclude Include="Pragma File Generator.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Asm File Generator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

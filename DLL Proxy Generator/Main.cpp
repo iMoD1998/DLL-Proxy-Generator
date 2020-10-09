@@ -6,6 +6,7 @@
 #include "Export Generator.h"
 #include "Def File Generator.h"
 #include "Pragma File Generator.h"
+#include "Asm File Generator.h"
 
 void GenerateDefForwardedExports( 
     _In_ const std::string&              DLLName,
@@ -20,7 +21,7 @@ void GenerateDefForwardedExports(
 		return;
 	}
 
-	Generator.Begin( NULL );
+	Generator.Begin( );
 
 	for ( const auto& Export : Entries )
 	{
@@ -45,7 +46,7 @@ void GeneratePragmasForwardedExports(
 		return;
 	}
 
-	Generator.Begin( NULL );
+	Generator.Begin();
 
 	for ( const auto& Export : Entries )
 	{
@@ -68,11 +69,10 @@ void GenerateASM(
 	std::ofstream ASMFileOut;
 	std::ofstream DLLMainFileOut;
 
-	std::shared_ptr<ExportGenerator> Generator;
+	auto LinkerGenerator = std::shared_ptr<ExportGenerator>();
+	auto StubGenerator   = ASMFileGenerator( DLLName + "ASMStubs.h" );
 
-	ASMFileOut.open( DLLName + "ASMStubs.h" );
-
-	if ( !ASMFileOut.is_open() )
+	if ( !StubGenerator.Open() )
 	{
 		printf( "Failed to open ASMStubs File\n" );
 		return;
@@ -80,9 +80,9 @@ void GenerateASM(
 
 	if ( UseDefFile )
 	{
-		Generator = std::make_shared< DefFileGenerator >( DLLName + "Stubs.def" );
+		LinkerGenerator = std::make_shared< DefFileGenerator >( DLLName + "Stubs.def" );
 
-		if ( !Generator->Open() )
+		if ( !LinkerGenerator->Open() )
 		{
 			printf( "Failed to open Def File\n" );
 			return;
@@ -90,90 +90,52 @@ void GenerateASM(
 	}
 	else
 	{
-		Generator = std::make_shared< PragmaFileGenerator >( DLLName + "StubsExports.h" );
+		LinkerGenerator = std::make_shared< PragmaFileGenerator >( DLLName + "StubsExports.h" );
 
-		if ( !Generator->Open() )
+		if ( !LinkerGenerator->Open() )
 		{
 			printf( "Failed to open Pragma Exports File\n" );
 			return;
 		}
 	}
 
-	std::string FunctionTableName = "";
-	SIZE_T      MachinePointerSize = 0;
-	UINT32      CurrentFunctionIndex = 0;
-
-	switch ( MachineType )
+	if ( !StubGenerator.Begin( MachineType, Entries.size() ) )
 	{
-		case IMAGE_FILE_MACHINE_AMD64:
-			ASMFileOut << ".DATA" << std::endl;
-			ASMFileOut << "g_FunctionTable QWORD " << Entries.size() << " dup(?)" << std::endl;
-			ASMFileOut << "PUBLIC g_FunctionTable" << std::endl << std::endl;
-			FunctionTableName = "g_FunctionTable";
-			MachinePointerSize = sizeof( UINT64 );
-			break;
-		case IMAGE_FILE_MACHINE_I386:
-			ASMFileOut << ".MODEL FLAT" << std::endl;
-			ASMFileOut << ".DATA" << std::endl;
-			ASMFileOut << "_g_FunctionTable DWORD " << Entries.size() << " dup(?)" << std::endl;
-			ASMFileOut << "PUBLIC _g_FunctionTable" << std::endl << std::endl;
-			FunctionTableName = "_g_FunctionTable"; // shitty calling convention decoration
-			MachinePointerSize = sizeof( UINT32 );
-			break;
-		default:
-			printf( "Unknown machine type %04X\n", MachineType );
-			return;
+		printf( "Stub generator failed to begin\n" );
+		return;
 	}
 
-	ASMFileOut << ".CODE" << std::endl;
-
-	Generator->Begin( MachineType );
+	if ( !LinkerGenerator->Begin( MachineType, NULL ) )
+	{
+		printf( "Linker generator failed to begin\n" );
+		return;
+	}
 
 	for ( const auto& Export : Entries )
 	{
 		if ( Export.IsData() )
 		{
 			if ( Export.HasName() )
-			{
 				printf( "Warning export %s is data\n", Export.GetName().c_str() );
-			}
 			else
-			{
 				printf( "Warning export ordinal %i is data\n", Export.GetOrdinal() );
-			}
 
 			continue;
 		}
 
-		std::string SymbolName = "Ordinal_" + std::to_string( CurrentFunctionIndex );
+		std::string SymbolName = "Ordinal_" + std::to_string( Export.GetOrdinal() );
 
 		if ( Export.HasName() )
-		{
 			SymbolName = Export.GetName();
-		}
 
-		/*
-			Generate Stub Like
+		StubGenerator.AddExportEntry( Export, SymbolName );
 
-			SymbolName PROC
-				jmp [FunctionTableName + FunctionIndex * MachinePointerSize]
-			SymbolName ENDP
-		
-		*/
-
-		ASMFileOut << SymbolName << " PROC" << std::endl;
-		ASMFileOut << "\tjmp [" << FunctionTableName << " + " << CurrentFunctionIndex << " * " << MachinePointerSize << "]" << std::endl;
-		ASMFileOut << SymbolName << " ENDP" << std::endl;
-		ASMFileOut << std::endl;
-
-		Generator->AddExportEntry( Export, SymbolName );
-
-		CurrentFunctionIndex++;
+		LinkerGenerator->AddExportEntry( Export, SymbolName );
 	}
 
-	Generator->End();
+	StubGenerator.End();
 
-	ASMFileOut << "END" << std::endl;
+	LinkerGenerator->End();
 }
 
 int main(int argc, const char* argv[])
