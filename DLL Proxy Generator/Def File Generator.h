@@ -32,11 +32,11 @@ public:
 	{
 		if ( Export.HasName() )
 		{
-			File << Export.GetName() << std::endl;
+			File << "\t" << Export.GetName() << std::endl;
 		}
 		else
 		{
-			File << SymbolName << " @ " << Export.GetOrdinal() << " NONAME" << std::endl;
+			File << "\t" << SymbolName << " @ " << Export.GetOrdinal() << " NONAME" << std::endl;
 		}
 
 		return true;
