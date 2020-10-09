@@ -28,7 +28,8 @@ public:
 	}
 
 	virtual bool Begin( 
-		_In_ UINT16 MachineType
+		_In_opt_ UINT16 MachineType,
+		_In_opt_ SIZE_T NumberOfEntries
 	) = 0;
 	
 	virtual bool End() = 0;
