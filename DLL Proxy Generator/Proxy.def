@@ -1,8 +1,0 @@
-LIBRARY
-EXPORTS
-	#36=ntdll.#36 @ 36 NONAME
-	HeapAlloc=ntdll.RtlAllocateHeap
-	ImAGayFunction=Proxy.ImAGayFunction
-	Lmao=Proxy.Lmao
-	#234=ntdll.#234 @ 234 NONAME
-	#456=ntdll.#456 @ 456 NONAME
