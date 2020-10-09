@@ -3,61 +3,33 @@
 #include <lyra/lyra.hpp>
 
 #include "ExportEntry.h"
+#include "Export Generator.h"
+#include "Def File Generator.h"
+#include "Pragma File Generator.h"
 
 void GenerateDefForwardedExports( 
     _In_ const std::string&              DLLName,
     _In_ const std::vector<ExportEntry>& Entries
 )
 {
-	std::ofstream DefFileOut;
+	auto Generator = DefFileGenerator( DLLName + ".def" );
 
-	DefFileOut.open( DLLName + ".def" );
-
-	if ( !DefFileOut.is_open() )
+	if ( !Generator.Open() )
 	{
-		printf( "Failed to open Def File\n" );
+		printf( "Failed to open Pragma Exports File\n" );
 		return;
 	}
 
-	DefFileOut << "LIBRARY" << std::endl;
-	DefFileOut << "EXPORTS" << std::endl;
+	Generator.Begin( NULL );
 
 	for ( const auto& Export : Entries )
 	{
-		if ( Export.HasName() )
-		{
-			DefFileOut << "\t" << Export.GetName() << "=";
-		}
-		else
-		{
-			DefFileOut << "\t#" << Export.GetOrdinal() << "=";
-		}
-
-		if ( Export.IsForwarded() )
-		{
-			DefFileOut << Export.GetForwardedName();
-
-			if ( !Export.HasName() )
-			{
-				DefFileOut << " @ " << Export.GetOrdinal() << " NONAME";
-			}
-		}
-		else
-		{
-			DefFileOut << DLLName << ".";
-
-			if ( Export.HasName() )
-			{
-				DefFileOut << Export.GetName();
-			}
-			else
-			{
-				DefFileOut << "#" << Export.GetOrdinal() << " @ " << Export.GetOrdinal() << " NONAME";
-			}
-		}
-
-		DefFileOut << std::endl;
+		Generator.AddForwardedExportEntry( Export, DLLName );
 	}
+
+	Generator.End();
+
+	printf( "Wrote %i def file exports to %s\n", Entries.size(), ( DLLName + ".def" ).c_str() );
 }
 
 void GeneratePragmasForwardedExports(
@@ -65,57 +37,22 @@ void GeneratePragmasForwardedExports(
     _In_ const std::vector<ExportEntry>& Entries
 )
 {
-	std::ofstream PragmaFileOut;
+	auto Generator = PragmaFileGenerator( DLLName + "Exports.h" );
 
-	PragmaFileOut.open( DLLName + "Exports.h" );
-
-	if ( !PragmaFileOut.is_open() )
+	if ( !Generator.Open() )
 	{
 		printf( "Failed to open Pragma Exports File\n" );
 		return;
 	}
 
+	Generator.Begin( NULL );
+
 	for ( const auto& Export : Entries )
 	{
-		if ( Export.HasName() )
-		{
-			PragmaFileOut << "#pragma comment(linker,\"/export:" << Export.GetName() << "=";
-		}
-		else
-		{
-			PragmaFileOut << "#pragma comment(linker,\"/export:#" << Export.GetOrdinal() << "=";
-		}
-
-		if ( Export.IsForwarded() )
-		{
-			PragmaFileOut << Export.GetForwardedName();
-
-			if ( !Export.HasName() )
-			{
-				PragmaFileOut << ",@" << Export.GetOrdinal() << ",NONAME";
-			}
-		}
-		else
-		{
-			PragmaFileOut << DLLName << ".";
-
-			if ( Export.HasName() )
-			{
-				PragmaFileOut << Export.GetName();
-			}
-			else
-			{
-				PragmaFileOut << "#" << Export.GetOrdinal() << ",@" << Export.GetOrdinal() << ",NONAME";
-			}
-		}
-
-		if ( Export.IsData() )
-		{
-			PragmaFileOut << ",DATA";
-		}
-
-		PragmaFileOut << "\")" << std::endl;
+		Generator.AddForwardedExportEntry( Export, DLLName );
 	}
+
+	Generator.End();
 
 	printf( "Wrote %i pragma exports to %s\n", Entries.size(), ( DLLName + "Exports.h" ).c_str() );
 }
@@ -131,6 +68,8 @@ void GenerateASM(
 	std::ofstream ASMFileOut;
 	std::ofstream DLLMainFileOut;
 
+	std::shared_ptr<ExportGenerator> Generator;
+
 	ASMFileOut.open( DLLName + "ASMStubs.h" );
 
 	if ( !ASMFileOut.is_open() )
@@ -141,22 +80,19 @@ void GenerateASM(
 
 	if ( UseDefFile )
 	{
-		DefPragmaFileOut.open( DLLName + "Stubs.def" );
+		Generator = std::make_shared< DefFileGenerator >( DLLName + "Stubs.def" );
 
-		if ( !DefPragmaFileOut.is_open() )
+		if ( !Generator->Open() )
 		{
 			printf( "Failed to open Def File\n" );
 			return;
 		}
-
-		DefPragmaFileOut << "LIBRARY" << std::endl;
-		DefPragmaFileOut << "EXPORTS" << std::endl;
 	}
 	else
 	{
-		DefPragmaFileOut.open( DLLName + "StubsExports.h" );
+		Generator = std::make_shared< PragmaFileGenerator >( DLLName + "StubsExports.h" );
 
-		if ( !DefPragmaFileOut.is_open() )
+		if ( !Generator->Open() )
 		{
 			printf( "Failed to open Pragma Exports File\n" );
 			return;
@@ -190,6 +126,8 @@ void GenerateASM(
 	}
 
 	ASMFileOut << ".CODE" << std::endl;
+
+	Generator->Begin( MachineType );
 
 	for ( const auto& Export : Entries )
 	{
@@ -228,31 +166,12 @@ void GenerateASM(
 		ASMFileOut << SymbolName << " ENDP" << std::endl;
 		ASMFileOut << std::endl;
 
-		if ( UseDefFile )
-		{
-			if ( Export.HasName() )
-			{
-				DefPragmaFileOut << Export.GetName() << std::endl;
-			}
-			else
-			{
-				DefPragmaFileOut << SymbolName <<  " @ " << Export.GetOrdinal() << " NONAME" << std::endl;
-			}
-		}
-		else
-		{
-			if ( Export.HasName() )
-			{
-				DefPragmaFileOut << "#pragma comment(linker,\"/export:" << Export.GetName() << "\")" << std::endl;
-			}
-			else
-			{
-				DefPragmaFileOut << "#pragma comment(linker,\"/export:" << SymbolName << ",@" << Export.GetOrdinal() << ",NONAME" << "\")" << std::endl;
-			}
-		}
+		Generator->AddExportEntry( Export, SymbolName );
 
 		CurrentFunctionIndex++;
 	}
+
+	Generator->End();
 
 	ASMFileOut << "END" << std::endl;
 }

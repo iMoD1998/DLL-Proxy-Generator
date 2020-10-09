@@ -154,7 +154,10 @@
     <ClCompile Include="Main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Def File Generator.h" />
+    <ClInclude Include="Export Generator.h" />
     <ClInclude Include="ExportEntry.h" />
+    <ClInclude Include="Pragma File Generator.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

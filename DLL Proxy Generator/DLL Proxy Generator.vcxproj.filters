@@ -26,5 +26,14 @@
     <ClInclude Include="ExportEntry.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Export Generator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Def File Generator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Pragma File Generator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
