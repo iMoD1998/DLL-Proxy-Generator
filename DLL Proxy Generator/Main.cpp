@@ -11,7 +11,8 @@
 #include "DLLMain Generator.h"
 
 void GenerateForwardedExports( 
-	_Inout_    VSGenerator&              VSProject,
+	_Inout_ VSGenerator&                 VSProject,
+	_In_ bool                            GenerateVSProject,
 	_In_ const std::filesystem::path&    OutDir,
 	_In_ const std::string&              DLLName,
 	_In_ const std::string&              NewDLLName,
@@ -71,13 +72,15 @@ void GenerateForwardedExports(
 
 	LinkerGenerator->End();
 
-	VSProject.Generate();
-
-	printf( "Wrote %i def file exports to %s\n", Entries.size(), ( DLLName + ".def" ).c_str() );
+	if ( GenerateVSProject )
+	{
+		VSProject.Generate();
+	}
 }
 
 void GenerateASM(
-	_Inout_    VSGenerator&              VSProject,
+	_Inout_ VSGenerator&                 VSProject,
+	_In_ bool                            GenerateVSProject,
 	_In_ const std::filesystem::path&    OutDir,
 	_In_ const std::string&              DLLName,
 	_In_ const std::vector<ExportEntry>& Entries,
@@ -187,7 +190,10 @@ void GenerateASM(
 
 	MainGenerator.Write();
 
-	VSProject.Generate();
+	if ( GenerateVSProject )
+	{
+		VSProject.Generate();
+	}
 }
 
 int main(int argc, const char* argv[])
@@ -266,11 +272,11 @@ int main(int argc, const char* argv[])
 
 		if ( ForwardDLL.size() )
 		{
-			GenerateForwardedExports( VSGen, OutputDir, DLLName, std::filesystem::path( ForwardDLL ).replace_extension().string(), Entries, PreferDef );
+			GenerateForwardedExports( VSGen, GenerateVSProject, OutputDir, DLLName, std::filesystem::path( ForwardDLL ).replace_extension().string(), Entries, PreferDef );
 		}
 		else
 		{
-			GenerateASM( VSGen, OutputDir, DLLName, Entries, PreferDef, MachineType );
+			GenerateASM( VSGen, GenerateVSProject, OutputDir, DLLName, Entries, PreferDef, MachineType );
 		}
 
 		//GenerateDefForwardedExports( DLLName, Entries );
