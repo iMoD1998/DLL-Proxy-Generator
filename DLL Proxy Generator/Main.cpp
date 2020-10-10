@@ -10,56 +10,70 @@
 #include "VS Generator.h"
 #include "DLLMain Generator.h"
 
-void GenerateDefForwardedExports( 
-	_Inout_    VSGenerator& VSProject,
-	_In_ const std::string& DLLName,
-	_In_ const std::vector<ExportEntry>& Entries
+void GenerateForwardedExports( 
+	_Inout_    VSGenerator&              VSProject,
+	_In_ const std::filesystem::path&    OutDir,
+	_In_ const std::string&              DLLName,
+	_In_ const std::string&              NewDLLName,
+	_In_ const std::vector<ExportEntry>& Entries,
+	_In_ bool                            UseDefFile
 )
 {
-	auto Generator = DefFileGenerator( DLLName + ".def" );
+	auto LinkerGenerator = std::shared_ptr<ExportGenerator>();
+	auto MainGenerator   = DLLMainGenerator( OutDir / "DLLMain.cpp" );
 
-	if ( !Generator.Open() )
+	if ( !MainGenerator.Open() )
 	{
-		printf( "Failed to open Pragma Exports File\n" );
+		printf( "Failed to open DLL Main File\n" );
 		return;
 	}
 
-	Generator.Begin( );
+	VSProject.AddFile<VSSourceFile>( "DLLMain.cpp" );
+
+	if ( UseDefFile )
+	{
+		LinkerGenerator = std::make_shared< DefFileGenerator >( OutDir / ( DLLName + ".def" ) );
+
+		if ( !LinkerGenerator->Open() )
+		{
+			printf( "Failed to open Def File\n" );
+			return;
+		}
+
+		VSProject.SetDefinitionFile( DLLName + ".def" );
+	}
+	else
+	{
+		LinkerGenerator = std::make_shared< PragmaFileGenerator >( OutDir / ( DLLName + "Exports.h" ) );
+
+		if ( !LinkerGenerator->Open() )
+		{
+			printf( "Failed to open Pragma Exports File\n" );
+			return;
+		}
+
+		VSProject.AddFile<VSHeaderFile>( DLLName + "Exports.h" );
+		MainGenerator.AddInclude( DLLName + "Exports.h" );
+	}
+
+	if ( !LinkerGenerator->Begin( NULL, NULL ) )
+	{
+		printf( "Linker generator failed to begin\n" );
+		return;
+	}
 
 	for ( const auto& Export : Entries )
 	{
-		Generator.AddForwardedExportEntry( Export, DLLName );
+		LinkerGenerator->AddForwardedExportEntry( Export, NewDLLName );
 	}
 
-	Generator.End();
+	MainGenerator.Write();
+
+	LinkerGenerator->End();
+
+	VSProject.Generate();
 
 	printf( "Wrote %i def file exports to %s\n", Entries.size(), ( DLLName + ".def" ).c_str() );
-}
-
-void GeneratePragmasForwardedExports(
-	_Inout_    VSGenerator& VSProject,
-	_In_ const std::string& DLLName,
-	_In_ const std::vector<ExportEntry>& Entries
-)
-{
-	auto Generator = PragmaFileGenerator( DLLName + "Exports.h" );
-
-	if ( !Generator.Open() )
-	{
-		printf( "Failed to open Pragma Exports File\n" );
-		return;
-	}
-
-	Generator.Begin();
-
-	for ( const auto& Export : Entries )
-	{
-		Generator.AddForwardedExportEntry( Export, DLLName );
-	}
-
-	Generator.End();
-
-	printf( "Wrote %i pragma exports to %s\n", Entries.size(), ( DLLName + "Exports.h" ).c_str() );
 }
 
 void GenerateASM(
@@ -88,6 +102,12 @@ void GenerateASM(
 		return;
 	}
 
+	if ( !MainGenerator.Open() )
+	{
+		printf( "Failed to open DLL Main File\n" );
+		return;
+	}
+
 	if ( UseDefFile )
 	{
 		LinkerGenerator = std::make_shared< DefFileGenerator >( OutDir / ( DLLName + "Stubs.def" ) );
@@ -111,12 +131,7 @@ void GenerateASM(
 		}
 
 		VSProject.AddFile<VSHeaderFile>( DLLName + "StubsExports.h" );
-	}
-
-	if ( !MainGenerator.Open() )
-	{
-		printf( "Failed to open DLL Main File\n" );
-		return;
+		MainGenerator.AddInclude( DLLName + "StubExports.h" );
 	}
 
 	if ( !StubGenerator.Begin( MachineType, Entries.size() ) )
@@ -180,19 +195,23 @@ int main(int argc, const char* argv[])
 	std::string DLLPathIn;
 	std::string OutDirIn;
 	std::string VSProjectName;
+	std::string ForwardDLL;
 
 	bool Verbose           = false;
 	bool ShouldShowHelp    = false;
 	bool GenerateVSProject = false;
+	bool PreferDef         = false;
 
 	auto CommandLineParser = lyra::cli();
 
 	CommandLineParser.add_argument( lyra::help( ShouldShowHelp ) );
-	CommandLineParser.add_argument( lyra::opt ( Verbose )                     [ "-v" ]  [ "--verbose" ]      ( "Show infomation about exports" ) );
-	CommandLineParser.add_argument( lyra::opt ( GenerateVSProject )           [ "-p" ] [ "--visualstudio" ]( "Generate Visual Studio project" ) );
-	CommandLineParser.add_argument( lyra::opt ( VSProjectName, "PROJNAME" )   [ "-n" ] [ "--vsname" ]     ( "Name for visual studio project" ) );
-	CommandLineParser.add_argument( lyra::opt ( OutDirIn,  "OUTDIR" )         [ "-o" ]  [ "--out" ]          ( "Out directory for files" ) );
-	CommandLineParser.add_argument( lyra::arg ( DLLPathIn, "DLLPATH" )                                     ( "Path of the DLL to get exports from" ).required() );
+	CommandLineParser.add_argument( lyra::opt ( Verbose )                        [ "-v" ]  [ "--verbose" ]     ( "Show infomation about exports" ) );
+	CommandLineParser.add_argument( lyra::opt ( GenerateVSProject )              [ "-p" ]  [ "--visualstudio" ]( "Generate Visual Studio project" ) );
+	CommandLineParser.add_argument( lyra::opt ( PreferDef )                      [ "-d" ]  [ "--def" ]         ( "Prefer def file over #pragma" ) );
+	CommandLineParser.add_argument( lyra::opt ( ForwardDLL,    "NEWDLLNAME" )    [ "-f" ]  [ "--forward" ]     ( "Use export forwarding to forward exports to old DLL with new name" ) );
+	CommandLineParser.add_argument( lyra::opt ( VSProjectName, "PROJNAME" )      [ "-n" ]  [ "--vsname" ]      ( "Name for visual studio project" ) );
+	CommandLineParser.add_argument( lyra::opt ( OutDirIn,      "OUTDIR" )        [ "-o" ]  [ "--out" ]         ( "Out directory for files" ) );
+	CommandLineParser.add_argument( lyra::arg ( DLLPathIn,     "DLLPATH" )                                     ( "Path of the DLL to get exports from" ).required() );
 
 	// Parse the program arguments:
 	auto ParsedArgs = CommandLineParser.parse( { argc, argv } );
@@ -245,7 +264,15 @@ int main(int argc, const char* argv[])
 		if ( GenerateVSProject )
 			OutputDir = VSGen.GetProjectPath();
 
-		GenerateASM( VSGen, OutputDir, DLLName, Entries, true, MachineType );
+		if ( ForwardDLL.size() )
+		{
+			GenerateForwardedExports( VSGen, OutputDir, DLLName, std::filesystem::path( ForwardDLL ).replace_extension().string(), Entries, PreferDef );
+		}
+		else
+		{
+			GenerateASM( VSGen, OutputDir, DLLName, Entries, PreferDef, MachineType );
+		}
+
 		//GenerateDefForwardedExports( DLLName, Entries );
 		//GeneratePragmasForwardedExports( DLLName, Entries );
 		//GenerateASM( DLLName, Entries, true, MachineType );

@@ -24,6 +24,11 @@ public:
 		return true;
 	}
 
+	void AddInclude( const std::string Text )
+	{
+		Includes += Text;
+	}
+
 	void AddBody( const std::string Text )
 	{
 		BodyText += Text;
@@ -57,6 +62,7 @@ public:
 protected:
 	std::filesystem::path Path;
 	std::ofstream File;
+	std::string Includes;
 	std::string BodyText;
 	std::string ProcessAttachText;
 	std::string ProcessDetachText;
