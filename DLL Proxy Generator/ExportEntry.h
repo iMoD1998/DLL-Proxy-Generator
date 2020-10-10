@@ -26,6 +26,11 @@ public:
 		return this->Ordinal;
 	}
 
+	UINT32 GetOrdinalIndex() const
+	{
+		return this->OrdinalIndex;
+	}
+
 	bool HasName() const
 	{
 		return this->Name.size() > 0;
@@ -96,8 +101,8 @@ public:
 	}
 
 private:
-	ExportEntry( UINT32 Ordinal )
-		: Ordinal( Ordinal ), Name( "" ), ForwardedName( "" ), RVA( 0 ), IsDataReference(false)
+	ExportEntry( UINT32 Ordinal, UINT32 OrdinalIndex )
+		: Ordinal( Ordinal ), OrdinalIndex( OrdinalIndex ), Name( "" ), ForwardedName( "" ), RVA( 0 ), IsDataReference(false)
 	{
 
 	}
@@ -123,6 +128,7 @@ private:
 	}
 
 	UINT32 Ordinal;
+	UINT32 OrdinalIndex;
 	std::string Name;
 	std::string ForwardedName;
 	UINT32 RVA;

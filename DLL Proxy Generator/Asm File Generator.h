@@ -5,7 +5,7 @@ class ASMFileGenerator : public ExportGenerator
 {
 public:
 	ASMFileGenerator( std::filesystem::path Path ) :
-		ExportGenerator( Path ), FunctionTableName( "" ), MachinePointerSize( 0 ), CurrentFunctionIndex( 0 )
+		ExportGenerator( Path ), FunctionTableName( "" ), MachinePointerSize( 0 )
 	{
 
 	}
@@ -80,7 +80,7 @@ public:
 		}
 
 		File << SymbolName << " PROC" << std::endl;
-		File << "\tjmp [" << FunctionTableName << " + " << CurrentFunctionIndex << " * " << MachinePointerSize << "]" << std::endl;
+		File << "\tjmp [" << this->FunctionTableName << " + " << Export.GetOrdinalIndex() << " * " << this->MachinePointerSize << "]" << std::endl;
 		File << SymbolName << " ENDP" << std::endl;
 		File << std::endl;
 
@@ -95,8 +95,17 @@ public:
 		return false;
 	}
 
+	std::string GetFunctionTableName() const
+	{
+		return this->FunctionTableName;
+	}
+
+	SIZE_T GetPointerSize() const
+	{
+		return this->MachinePointerSize;
+	}
+
 protected:
 	std::string FunctionTableName;
 	SIZE_T      MachinePointerSize;
-	SIZE_T      CurrentFunctionIndex;
 };

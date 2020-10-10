@@ -7,10 +7,13 @@
 #include "Def File Generator.h"
 #include "Pragma File Generator.h"
 #include "Asm File Generator.h"
+#include "VS Generator.h"
+#include "DLLMain Generator.h"
 
 void GenerateDefForwardedExports( 
-    _In_ const std::string&              DLLName,
-    _In_ const std::vector<ExportEntry>& Entries
+	_Inout_    VSGenerator& VSProject,
+	_In_ const std::string& DLLName,
+	_In_ const std::vector<ExportEntry>& Entries
 )
 {
 	auto Generator = DefFileGenerator( DLLName + ".def" );
@@ -34,8 +37,9 @@ void GenerateDefForwardedExports(
 }
 
 void GeneratePragmasForwardedExports(
-    _In_ const std::string&              DLLName,
-    _In_ const std::vector<ExportEntry>& Entries
+	_Inout_    VSGenerator& VSProject,
+	_In_ const std::string& DLLName,
+	_In_ const std::vector<ExportEntry>& Entries
 )
 {
 	auto Generator = PragmaFileGenerator( DLLName + "Exports.h" );
@@ -59,6 +63,8 @@ void GeneratePragmasForwardedExports(
 }
 
 void GenerateASM(
+	_Inout_    VSGenerator&              VSProject,
+	_In_ const std::filesystem::path&    OutDir,
 	_In_ const std::string&              DLLName,
 	_In_ const std::vector<ExportEntry>& Entries,
 	_In_ bool                            UseDefFile,
@@ -70,7 +76,11 @@ void GenerateASM(
 	std::ofstream DLLMainFileOut;
 
 	auto LinkerGenerator = std::shared_ptr<ExportGenerator>();
-	auto StubGenerator   = ASMFileGenerator( DLLName + "ASMStubs.h" );
+	auto StubGenerator   = ASMFileGenerator( OutDir / ( DLLName + "ASMStubs.asm" ) );
+	auto MainGenerator   = DLLMainGenerator( OutDir / "DLLMain.cpp" );
+
+	VSProject.AddFile<VSMASMFile>( DLLName + "ASMStubs.asm" );
+	VSProject.AddFile<VSSourceFile>( "DLLMain.cpp" );
 
 	if ( !StubGenerator.Open() )
 	{
@@ -80,23 +90,33 @@ void GenerateASM(
 
 	if ( UseDefFile )
 	{
-		LinkerGenerator = std::make_shared< DefFileGenerator >( DLLName + "Stubs.def" );
+		LinkerGenerator = std::make_shared< DefFileGenerator >( OutDir / ( DLLName + "Stubs.def" ) );
 
 		if ( !LinkerGenerator->Open() )
 		{
 			printf( "Failed to open Def File\n" );
 			return;
 		}
+
+		VSProject.SetDefinitionFile( DLLName + "Stubs.def" );
 	}
 	else
 	{
-		LinkerGenerator = std::make_shared< PragmaFileGenerator >( DLLName + "StubsExports.h" );
+		LinkerGenerator = std::make_shared< PragmaFileGenerator >( OutDir / ( DLLName + "StubExports.h" ) );
 
 		if ( !LinkerGenerator->Open() )
 		{
 			printf( "Failed to open Pragma Exports File\n" );
 			return;
 		}
+
+		VSProject.AddFile<VSHeaderFile>( DLLName + "StubsExports.h" );
+	}
+
+	if ( !MainGenerator.Open() )
+	{
+		printf( "Failed to open DLL Main File\n" );
+		return;
 	}
 
 	if ( !StubGenerator.Begin( MachineType, Entries.size() ) )
@@ -111,6 +131,10 @@ void GenerateASM(
 		return;
 	}
 
+	MainGenerator.AddBody( "extern \"C\" void* g_FunctionTable[];\n\n" );
+	MainGenerator.AddBody( "void PopulateFunctionTable()\n{\n" );
+	MainGenerator.AddBody( "\tHMODULE OriginalModule = LoadLibraryA( \"" + DLLName + ".dll\" );\n" );
+
 	for ( const auto& Export : Entries )
 	{
 		if ( Export.IsData() )
@@ -124,31 +148,51 @@ void GenerateASM(
 		}
 
 		std::string SymbolName = "Ordinal_" + std::to_string( Export.GetOrdinal() );
+		std::string ExportName = "#" + std::to_string( Export.GetOrdinal() );
 
 		if ( Export.HasName() )
+		{
 			SymbolName = Export.GetName();
+			ExportName = Export.GetName();
+		}
 
 		StubGenerator.AddExportEntry( Export, SymbolName );
 
 		LinkerGenerator->AddExportEntry( Export, SymbolName );
+
+		MainGenerator.AddBody( "\tg_FunctionTable[ " + std::to_string( Export.GetOrdinalIndex() ) + " ] = GetProcAddress( OriginalModule, \"" + ExportName + "\" );\n" );
 	}
+
+	MainGenerator.AddBody( "}\n" );
+	MainGenerator.AddProcessAttach( "\tPopulateFunctionTable();\n" );
 
 	StubGenerator.End();
 
 	LinkerGenerator->End();
+
+	MainGenerator.Write();
+
+	VSProject.Generate();
 }
 
 int main(int argc, const char* argv[])
 {
 	std::string DLLPathIn;
-	bool Verbose = false;
-	bool ShouldShowHelp = false;
+	std::string OutDirIn;
+	std::string VSProjectName;
+
+	bool Verbose           = false;
+	bool ShouldShowHelp    = false;
+	bool GenerateVSProject = false;
 
 	auto CommandLineParser = lyra::cli();
 
 	CommandLineParser.add_argument( lyra::help( ShouldShowHelp ) );
-	CommandLineParser.add_argument( lyra::opt( Verbose )[ "-v" ][ "--verbose" ]( "Show infomation about exports" ) );
-	CommandLineParser.add_argument( lyra::arg( DLLPathIn, "DLLPATH" )( "Path of the DLL to get exports from" ).required() );
+	CommandLineParser.add_argument( lyra::opt ( Verbose )                     [ "-v" ]  [ "--verbose" ]      ( "Show infomation about exports" ) );
+	CommandLineParser.add_argument( lyra::opt ( GenerateVSProject )           [ "-p" ] [ "--visualstudio" ]( "Generate Visual Studio project" ) );
+	CommandLineParser.add_argument( lyra::opt ( VSProjectName, "PROJNAME" )   [ "-n" ] [ "--vsname" ]     ( "Name for visual studio project" ) );
+	CommandLineParser.add_argument( lyra::opt ( OutDirIn,  "OUTDIR" )         [ "-o" ]  [ "--out" ]          ( "Out directory for files" ) );
+	CommandLineParser.add_argument( lyra::arg ( DLLPathIn, "DLLPATH" )                                     ( "Path of the DLL to get exports from" ).required() );
 
 	// Parse the program arguments:
 	auto ParsedArgs = CommandLineParser.parse( { argc, argv } );
@@ -172,13 +216,39 @@ int main(int argc, const char* argv[])
 
 	UINT16 MachineType = 0;
 
+	if ( OutDirIn.size() != 0 )
+	{
+		if ( !std::filesystem::exists( OutDirIn ) || !std::filesystem::is_directory( OutDirIn ) )
+		{
+			printf( "Enter valid output directory\n" );
+			return 1;
+		}
+	}
+
+	if ( !std::filesystem::exists( DLLPath ) )
+	{
+		printf( "DLL file doesnt exist\n" );
+		return 2;
+	}
+
+	auto DLLName = DLLPath.filename().replace_extension( "" ).string();
+
+	if ( VSProjectName.size() == 0 )
+		VSProjectName = DLLName + " Proxy";
+
 	if ( ExportEntry::GetExportEntries( DLLPath, Entries, Verbose, &MachineType ) )
 	{
-		auto DLLName = DLLPath.filename().replace_extension( "" ).string();
+		auto VSGen = VSGenerator( VSProjectName, OutDirIn, MachineType );
 
-		GenerateDefForwardedExports( DLLName, Entries );
-		GeneratePragmasForwardedExports( DLLName, Entries );
-		GenerateASM( DLLName, Entries, true, MachineType );
+		std::filesystem::path OutputDir = OutDirIn;
+
+		if ( GenerateVSProject )
+			OutputDir = VSGen.GetProjectPath();
+
+		GenerateASM( VSGen, OutputDir, DLLName, Entries, true, MachineType );
+		//GenerateDefForwardedExports( DLLName, Entries );
+		//GeneratePragmasForwardedExports( DLLName, Entries );
+		//GenerateASM( DLLName, Entries, true, MachineType );
 	}
 
 	return 0;

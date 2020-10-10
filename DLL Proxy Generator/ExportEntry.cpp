@@ -78,7 +78,7 @@ bool ExportEntry::GetExportEntries(
 
 		for ( UINT32 OrdinalIndex = 0; OrdinalIndex < ImageExportDirectory->NumberOfFunctions; OrdinalIndex++ )
 		{
-			auto Export          = ExportEntry( ImageExportDirectory->Base + OrdinalIndex );
+			auto Export          = ExportEntry( ImageExportDirectory->Base + OrdinalIndex, OrdinalIndex );
 			auto FunctionRVA     = FunctionArray[ OrdinalIndex ];
 			auto FunctionAddress = (UINT_PTR)ImageRvaToVa( LoadedImage.FileHeader, LoadedImage.MappedAddress, FunctionRVA, NULL );
 
