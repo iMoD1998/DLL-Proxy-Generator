@@ -101,8 +101,10 @@ public:
 	}
 
 private:
-	ExportEntry( UINT32 Ordinal, UINT32 OrdinalIndex )
-		: Ordinal( Ordinal ), OrdinalIndex( OrdinalIndex ), Name( "" ), ForwardedName( "" ), RVA( 0 ), IsDataReference(false)
+	ExportEntry( 
+		_In_ UINT32 Ordinal,
+		_In_ UINT32 OrdinalIndex
+	) : Ordinal( Ordinal ), OrdinalIndex( OrdinalIndex ), Name( "" ), ForwardedName( "" ), RVA( 0 ), IsDataReference(false)
 	{
 
 	}

@@ -5,8 +5,9 @@
 class DLLMainGenerator
 {
 public:
-	DLLMainGenerator( std::filesystem::path Path ) :
-		Path( Path )
+	DLLMainGenerator(
+		_In_ std::filesystem::path Path
+	) :	Path( Path )
 	{
 
 	}

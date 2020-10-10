@@ -4,8 +4,9 @@
 class ASMFileGenerator : public ExportGenerator
 {
 public:
-	ASMFileGenerator( std::filesystem::path Path ) :
-		ExportGenerator( Path ), FunctionTableName( "" ), MachinePointerSize( 0 )
+	ASMFileGenerator( 
+		_In_ std::filesystem::path Path
+	) :	ExportGenerator( Path ), FunctionTableName( "" ), MachinePointerSize( 0 )
 	{
 
 	}

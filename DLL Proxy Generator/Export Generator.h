@@ -8,8 +8,9 @@
 class ExportGenerator
 {
 public:
-	ExportGenerator(std::filesystem::path Path) :
-		Path( Path )
+	ExportGenerator(
+		_In_ std::filesystem::path Path
+	) :	Path( Path )
 	{
 		/*Guess this can fail but we will handle outside to make sure path exists etc*/
 	}

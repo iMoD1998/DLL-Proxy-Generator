@@ -5,8 +5,9 @@
 class PragmaFileGenerator : public ExportGenerator
 {
 public:
-	PragmaFileGenerator( std::filesystem::path Path ) :
-		ExportGenerator( Path )
+	PragmaFileGenerator(
+		_In_ std::filesystem::path Path
+	) :	ExportGenerator( Path )
 	{
 
 	}

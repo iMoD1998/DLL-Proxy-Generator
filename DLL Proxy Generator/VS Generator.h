@@ -10,8 +10,9 @@
 class VSFile
 {
 public:
-	VSFile( std::string Name )
-		: Name( Name )
+	VSFile(
+		_In_  std::string Name
+	) : Name( Name )
 	{
 
 	}
@@ -24,8 +25,9 @@ public:
 class VSMASMFile : public VSFile
 {
 public:
-	VSMASMFile( std::string Name )
-		: VSFile( Name )
+	VSMASMFile(
+		_In_  std::string Name
+	) : VSFile( Name )
 	{
 
 	}
@@ -49,8 +51,9 @@ public:
 class VSSourceFile : public VSFile
 {
 public:
-	VSSourceFile( std::string Name )
-		: VSFile( Name )
+	VSSourceFile(
+		_In_  std::string Name
+	) : VSFile( Name )
 	{
 
 	}
@@ -64,8 +67,9 @@ public:
 class VSHeaderFile : public VSFile
 {
 public:
-	VSHeaderFile( std::string Name )
-		: VSFile( Name )
+	VSHeaderFile( 
+		_In_  std::string Name
+	) : VSFile( Name )
 	{
 
 	}
@@ -79,8 +83,11 @@ public:
 class VSProjectConfig
 {
 public:
-	VSProjectConfig( std::string IncludeName, std::string Type, std::string PlatformName )
-		: IncludeName( IncludeName ), Type( Type ), PlatformName( PlatformName )
+	VSProjectConfig( 
+		_In_ std::string IncludeName,
+		_In_ std::string Type,
+		_In_ std::string PlatformName
+	) : IncludeName( IncludeName ), Type( Type ), PlatformName( PlatformName )
 	{
 
 	}
@@ -93,8 +100,11 @@ public:
 class VSGenerator
 {
 public:
-	VSGenerator(std::string Name, std::filesystem::path OutDir, UINT16 MachineType)
-		: Name( Name ), MachineType( MachineType ), OutDir( OutDir / Name )
+	VSGenerator(
+		_In_ std::string           Name,
+		_In_ std::filesystem::path OutDir,
+		_In_ UINT16                MachineType
+	) : Name( Name ), MachineType( MachineType ), OutDir( OutDir / Name )
 	{
 		std::filesystem::create_directories( OutDir / Name );
 	}
@@ -284,15 +294,17 @@ public:
 		return NewFile;
 	}
 
-	void SetDefinitionFile( std::string Name )
+	void SetDefinitionFile( 
+		_In_ std::string Name
+	)
 	{
 		this->DefinitionFile = Name;
 	}
 	
 protected:
-	std::string Name;
-	std::string DefinitionFile;
-	std::filesystem::path OutDir;
-	UINT16 MachineType;
+	std::string                          Name;
+	std::string                          DefinitionFile;
+	std::filesystem::path                OutDir;
+	UINT16                               MachineType;
 	std::vector<std::shared_ptr<VSFile>> Files;
 };

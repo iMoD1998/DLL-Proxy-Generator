@@ -5,8 +5,9 @@
 class DefFileGenerator : public ExportGenerator
 {
 public:
-	DefFileGenerator( std::filesystem::path Path ) :
-		ExportGenerator( Path )
+	DefFileGenerator(
+		_In_ std::filesystem::path Path
+	) :	ExportGenerator( Path )
 	{
 
 	}
