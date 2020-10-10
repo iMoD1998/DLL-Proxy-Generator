@@ -133,7 +133,7 @@ void GenerateASM(
 			return;
 		}
 
-		VSProject.AddFile<VSHeaderFile>( DLLName + "StubsExports.h" );
+		VSProject.AddFile<VSHeaderFile>( DLLName + "StubExports.h" );
 		MainGenerator.AddInclude( DLLName + "StubExports.h" );
 	}
 
